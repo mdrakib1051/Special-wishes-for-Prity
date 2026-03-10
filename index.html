@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Interactive Universe - Prity</title>
+    <title>Manual Control Universe - Prity</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         #instruction {
             position: absolute; top: 20px; width: 100%; text-align: center;
             color: #00d2ff; font-family: 'Segoe UI', sans-serif; z-index: 10;
-            letter-spacing: 1px; font-size: 14px; text-transform: uppercase;
+            letter-spacing: 2px; font-size: 14px; font-weight: bold;
         }
-        #video_container { position: absolute; bottom: 10px; right: 10px; width: 120px; height: 90px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0, 210, 255, 0.3); opacity: 0.5; }
+        #video_container { position: absolute; bottom: 10px; right: 10px; width: 100px; height: 75px; border-radius: 5px; overflow: hidden; opacity: 0.3; border: 1px solid white; }
         video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body>
 
-    <div id="instruction">আঙুল দিয়ে চুটকি (Pinch) দিন পরবর্তী মেসেজের জন্য ✨</div>
+    <div id="instruction">PINCH FINGERS TO FORM NAME ✨</div>
     <div id="video_container"><video id="input_video"></video></div>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -27,12 +27,12 @@
 
     <script>
         let scene, camera, renderer, particleSystem;
-        const particleCount = 6000;
+        const particleCount = 8000; // কণা বাড়িয়ে দিলাম যাতে নাম স্পষ্ট হয়
         let particles = [];
         let handX = 0, handY = 0;
         let currentShape = 0;
-        let isPinching = false;
-        const messages = ["PRITY", "CUTE PEKNI", "BESTEST FRIEND", "STAY ALWAYS", "SMILE PLZ"];
+        let isTransitioning = false;
+        const messages = ["PRITY", "CUTE", "BESTIE", "FUNNY", "SMILE"];
 
         function initThree() {
             scene = new THREE.Scene();
@@ -46,31 +46,37 @@
             const geometry = new THREE.BufferGeometry();
             const posArray = new Float32Array(particleCount * 3);
 
+            // শুরুতে পুরো স্ক্রিনে ছড়িয়ে থাকবে
             for (let i = 0; i < particleCount; i++) {
-                posArray[i*3] = (Math.random() - 0.5) * 10;
-                posArray[i*3+1] = (Math.random() - 0.5) * 10;
+                posArray[i*3] = (Math.random() - 0.5) * 20;
+                posArray[i*3+1] = (Math.random() - 0.5) * 20;
                 posArray[i*3+2] = (Math.random() - 0.5) * 10;
                 particles.push({ x: posArray[i*3], y: posArray[i*3+1], z: posArray[i*3+2] });
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            const material = new THREE.PointsMaterial({ size: 0.025, color: 0x00d2ff, transparent: true, blending: THREE.AdditiveBlending });
+            const material = new THREE.PointsMaterial({ size: 0.02, color: 0x00d2ff, transparent: true, blending: THREE.AdditiveBlending });
             particleSystem = new THREE.Points(geometry, material);
             scene.add(particleSystem);
             animate();
         }
 
-        // মিডিয়াম স্পিড অ্যানিমেশন (TWEEN Duration: 2500ms)
-        function changeToNextMessage() {
+        // পুরো স্ক্রিন থেকে কণাগুলো এসে নাম তৈরি করবে
+        function formName() {
+            if(isTransitioning) return;
+            isTransitioning = true;
+
             const text = messages[currentShape];
             const nextPoints = getLayout(text);
 
             const pos = particleSystem.geometry.attributes.position.array;
             for(let i=0; i<particleCount; i++) {
                 let target = nextPoints[i % nextPoints.length];
+                
                 new TWEEN.Tween(particles[i])
-                    .to({ x: target.x, y: target.y, z: target.z }, 2500) // মিডিয়াম স্পিড
-                    .easing(TWEEN.Easing.Cubic.InOut)
+                    .to({ x: target.x, y: target.y, z: target.z }, 3000) // মিডিয়াম স্পিড
+                    .easing(TWEEN.Easing.Quintic.Out)
+                    .onComplete(() => { isTransitioning = false; })
                     .start();
             }
             currentShape = (currentShape + 1) % messages.length;
@@ -80,39 +86,38 @@
             let canvas = document.createElement('canvas');
             let ctx = canvas.getContext('2d');
             canvas.width = 400; canvas.height = 200;
-            ctx.fillStyle = "white"; ctx.font = "bold 50px Arial"; ctx.textAlign = "center";
+            ctx.fillStyle = "white"; ctx.font = "bold 60px Arial"; ctx.textAlign = "center";
             ctx.fillText(text, 200, 110);
             let data = ctx.getImageData(0,0,400,200).data;
             let targetPoints = [];
-            for(let y=0; y<200; y+=2) {
-                for(let x=0; x<400; x+=2) {
+            for(let y=0; y<200; y+=1) {
+                for(let x=0; x<400; x+=1) {
                     if(data[(y*400+x)*4+3] > 128) targetPoints.push({ x: (x-200)/30, y: -(y-100)/30, z: 0 });
                 }
             }
             return targetPoints;
         }
 
+        // মিডিয়াপাইপ সেটআপ
         const videoElement = document.getElementById('input_video');
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.7, minTrackingConfidence: 0.7 });
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
+                
+                // আঙুলের ডগা অনুসরণ
                 handX = (landmarks[8].x - 0.5) * -12;
                 handY = (landmarks[8].y - 0.5) * -12;
 
-                // Pinch detection (Index finger and Thumb close together)
+                // চুটকি শনাক্তকরণ (Index + Thumb)
                 const dx = landmarks[8].x - landmarks[4].x;
                 const dy = landmarks[8].y - landmarks[4].y;
-                const distance = Math.sqrt(dx*dx + dy*dy);
+                const dist = Math.sqrt(dx*dx + dy*dy);
 
-                if (distance < 0.05) { // চুটকি দিলে
-                    if (!isPinching) {
-                        changeToNextMessage();
-                        isPinching = true;
-                        setTimeout(() => { isPinching = false; }, 3000); // ৩ সেকেন্ড ডিলে
-                    }
+                if (dist < 0.04) { 
+                    formName();
                 }
             }
         });
@@ -127,10 +132,14 @@
             requestAnimationFrame(animate);
             TWEEN.update();
             const pos = particleSystem.geometry.attributes.position.array;
+            
             for(let i=0; i<particleCount; i++){
                 let p = particles[i];
-                p.x += (handX - p.x) * 0.04;
-                p.y += (handY - p.y) * 0.04;
+                // শুধুমাত্র ট্রানজিশন না চললে হাতকে হালকা অনুসরণ করবে
+                if(!isTransitioning) {
+                    p.x += (handX - p.x) * 0.02;
+                    p.y += (handY - p.y) * 0.02;
+                }
                 pos[i*3] = p.x; pos[i*3+1] = p.y; pos[i*3+2] = p.z;
             }
             particleSystem.geometry.attributes.position.needsUpdate = true;

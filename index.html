@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>For My Bestie Prity</title>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; font-family: 'Arial', sans-serif; }
+        canvas { display: block; }
+        #msg {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            color: white; font-size: 3rem; font-weight: bold;
+            text-shadow: 0 0 20px #fff, 0 0 30px #00d2ff;
+            pointer-events: none; opacity: 0; transition: opacity 0.5s;
+            text-align: center; width: 80%;
+        }
+        #instruction {
+            position: absolute; bottom: 30px; width: 100%;
+            text-align: center; color: rgba(255,255,255,0.6); font-size: 16px;
+            letter-spacing: 1px;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="msg">Prity</div>
+    <div id="instruction">প্রীতি, একটা তালি দাও তো! 👏 (Click to Start)</div>
+    <canvas id="universe"></canvas>
+
+    <script>
+        const canvas = document.getElementById('universe');
+        const ctx = canvas.getContext('2d');
+        const msgDiv = document.getElementById('msg');
+        let width, height, particles = [];
+        
+        // বন্ধুত্বের কিউট মেসেজগুলো এখানে
+        let messages = [
+            "Prity!", 
+            "You are my bestest test friend! 🏆", 
+            "সবচেয়ে সুন্দরী আর কিউট পেত্নী! 😂", 
+            "সারা জীবন এভাবেই পাশে থাকিস 🤝", 
+            "You are so funny and special! ✨",
+            "Bestie For Life! 🎈"
+        ];
+        let msgIndex = 0;
+        let isCoolDown = false;
+
+        function init() {
+            width = canvas.width = window.innerWidth;
+            height = canvas.height = window.innerHeight;
+            particles = [];
+            for(let i=0; i<200; i++) {
+                particles.push({
+                    x: Math.random() * width,
+                    y: Math.random() * height,
+                    size: Math.random() * 2 + 0.5,
+                    speedX: Math.random() * 2 - 1,
+                    speedY: Math.random() * 2 - 1
+                });
+            }
+        }
+
+        function animate() {
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+            ctx.fillRect(0, 0, width, height);
+            
+            particles.forEach(p => {
+                p.x += p.speedX;
+                p.y += p.speedY;
+                if(p.x > width) p.x = 0; if(p.x < 0) p.x = width;
+                if(p.y > height) p.y = 0; if(p.y < 0) p.y = height;
+                
+                ctx.fillStyle = '#00d2ff';
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+                ctx.fill();
+            });
+            requestAnimationFrame(animate);
+        }
+
+        async function startAudio() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+                const source = audioContext.createMediaStreamSource(stream);
+                const analyser = audioContext.createAnalyser();
+                analyser.fftSize = 256;
+                source.connect(analyser);
+
+                const dataArray = new Uint8Array(analyser.frequencyBinCount);
+
+                function checkClap() {
+                    analyser.getByteFrequencyData(dataArray);
+                    let average = dataArray.reduce((a, b) => a + b) / dataArray.length;
+
+                    if (average > 50 && !isCoolDown) { 
+                        showNextMessage();
+                        isCoolDown = true;
+                        setTimeout(() => { isCoolDown = false; }, 1500); 
+                    }
+                    requestAnimationFrame(checkClap);
+                }
+                checkClap();
+                document.getElementById('instruction').innerText = "আবার তালি দাও! 👏";
+            } catch (err) {
+                console.error("Audio block:", err);
+            }
+        }
+
+        function showNextMessage() {
+            msgDiv.innerText = messages[msgIndex];
+            msgDiv.style.opacity = 1;
+            msgIndex = (msgIndex + 1) % messages.length;
+            
+            // নক্ষত্রগুলোকে একটু উত্তেজিত করার জন্য
+            particles.forEach(p => {
+                p.speedX *= 5;
+                p.speedY *= 5;
+                setTimeout(() => {
+                    p.speedX /= 5;
+                    p.speedY /= 5;
+                }, 500);
+            });
+
+            setTimeout(() => { msgDiv.style.opacity = 0; }, 2000);
+        }
+
+        window.addEventListener('click', () => {
+            startAudio();
+            msgDiv.innerText = "Ready?";
+            msgDiv.style.opacity = 1;
+            setTimeout(() => { msgDiv.style.opacity = 0; }, 1000);
+        });
+
+        window.addEventListener('resize', init);
+        init();
+        animate();
+    </script>
+</body>
+</html>

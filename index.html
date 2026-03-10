@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Hand Controlled Universe for Prity</title>
+    <title>Hand Interactive Universe - Prity</title>
     <style>
         body { margin: 0; overflow: hidden; background: #000; }
         #instruction {
             position: absolute; top: 20px; width: 100%; text-align: center;
-            color: #00d2ff; font-family: sans-serif; z-index: 10;
+            color: #00d2ff; font-family: 'Segoe UI', sans-serif; z-index: 10;
+            letter-spacing: 1px; font-size: 14px; text-transform: uppercase;
         }
-        /* ক্যামেরা প্রিভিউ ছোট করে কোণায় থাকবে */
-        #video_container { position: absolute; bottom: 10px; right: 10px; width: 150px; height: 110px; border-radius: 10px; overflow: hidden; border: 2px solid #00d2ff; }
+        #video_container { position: absolute; bottom: 10px; right: 10px; width: 120px; height: 90px; border-radius: 8px; overflow: hidden; border: 1px solid rgba(0, 210, 255, 0.3); opacity: 0.5; }
         video { transform: scaleX(-1); width: 100%; height: 100%; object-fit: cover; }
     </style>
 </head>
 <body>
 
-    <div id="instruction">Allow Camera & Move Your Hand to Control! ✨</div>
+    <div id="instruction">আঙুল দিয়ে চুটকি (Pinch) দিন পরবর্তী মেসেজের জন্য ✨</div>
     <div id="video_container"><video id="input_video"></video></div>
     
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -27,12 +27,13 @@
 
     <script>
         let scene, camera, renderer, particleSystem;
-        const particleCount = 5000;
+        const particleCount = 6000;
         let particles = [];
         let handX = 0, handY = 0;
         let currentShape = 0;
+        let isPinching = false;
+        const messages = ["PRITY", "CUTE PEKNI", "BESTEST FRIEND", "STAY ALWAYS", "SMILE PLZ"];
 
-        // ১. Three.js সেটআপ
         function initThree() {
             scene = new THREE.Scene();
             camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 0.1, 1000);
@@ -53,60 +54,66 @@
             }
 
             geometry.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
-            const material = new THREE.PointsMaterial({ size: 0.03, color: 0x00d2ff, transparent: true, blending: THREE.AdditiveBlending });
+            const material = new THREE.PointsMaterial({ size: 0.025, color: 0x00d2ff, transparent: true, blending: THREE.AdditiveBlending });
             particleSystem = new THREE.Points(geometry, material);
             scene.add(particleSystem);
             animate();
         }
 
-        // ২. শেপ চেঞ্জ লজিক (হাত এক জায়গায় স্থির রাখলে বা ক্লিক করলে)
-        function changeShape() {
-            let nextPoints;
-            if(currentShape === 0) nextPoints = getLayout("PRITY");
-            else if(currentShape === 1) nextPoints = getLayout("BESTIE");
-            else nextPoints = getCubeLayout();
+        // মিডিয়াম স্পিড অ্যানিমেশন (TWEEN Duration: 2500ms)
+        function changeToNextMessage() {
+            const text = messages[currentShape];
+            const nextPoints = getLayout(text);
 
             const pos = particleSystem.geometry.attributes.position.array;
             for(let i=0; i<particleCount; i++) {
                 let target = nextPoints[i % nextPoints.length];
-                new TWEEN.Tween(particles[i]).to({ x: target.x, y: target.y, z: target.z }, 1500).easing(TWEEN.Easing.Exponential.InOut).start();
+                new TWEEN.Tween(particles[i])
+                    .to({ x: target.x, y: target.y, z: target.z }, 2500) // মিডিয়াম স্পিড
+                    .easing(TWEEN.Easing.Cubic.InOut)
+                    .start();
             }
-            currentShape = (currentShape + 1) % 3;
-        }
-
-        function getCubeLayout() {
-            let pts = [];
-            for (let i = 0; i < particleCount; i++) pts.push({ x: (Math.random()-0.5)*4, y: (Math.random()-0.5)*4, z: (Math.random()-0.5)*4 });
-            return pts;
+            currentShape = (currentShape + 1) % messages.length;
         }
 
         function getLayout(text) {
             let canvas = document.createElement('canvas');
             let ctx = canvas.getContext('2d');
             canvas.width = 400; canvas.height = 200;
-            ctx.fillStyle = "white"; ctx.font = "bold 60px Arial"; ctx.textAlign = "center";
+            ctx.fillStyle = "white"; ctx.font = "bold 50px Arial"; ctx.textAlign = "center";
             ctx.fillText(text, 200, 110);
             let data = ctx.getImageData(0,0,400,200).data;
             let targetPoints = [];
-            for(let y=0; y<200; y+=3) {
-                for(let x=0; x<400; x+=3) {
+            for(let y=0; y<200; y+=2) {
+                for(let x=0; x<400; x+=2) {
                     if(data[(y*400+x)*4+3] > 128) targetPoints.push({ x: (x-200)/30, y: -(y-100)/30, z: 0 });
                 }
             }
             return targetPoints;
         }
 
-        // ৩. হ্যান্ড ট্র্যাকিং লজিক
         const videoElement = document.getElementById('input_video');
         const hands = new Hands({locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${file}`});
         
-        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.5, minTrackingConfidence: 0.5 });
+        hands.setOptions({ maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.6 });
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
-                // Index Finger Tip (Landmark 8)
-                handX = (landmarks[8].x - 0.5) * -10;
-                handY = (landmarks[8].y - 0.5) * -10;
+                handX = (landmarks[8].x - 0.5) * -12;
+                handY = (landmarks[8].y - 0.5) * -12;
+
+                // Pinch detection (Index finger and Thumb close together)
+                const dx = landmarks[8].x - landmarks[4].x;
+                const dy = landmarks[8].y - landmarks[4].y;
+                const distance = Math.sqrt(dx*dx + dy*dy);
+
+                if (distance < 0.05) { // চুটকি দিলে
+                    if (!isPinching) {
+                        changeToNextMessage();
+                        isPinching = true;
+                        setTimeout(() => { isPinching = false; }, 3000); // ৩ সেকেন্ড ডিলে
+                    }
+                }
             }
         });
 
@@ -122,16 +129,14 @@
             const pos = particleSystem.geometry.attributes.position.array;
             for(let i=0; i<particleCount; i++){
                 let p = particles[i];
-                // আঙুলের দিকে আকর্ষণ
-                p.x += (handX - p.x) * 0.05;
-                p.y += (handY - p.y) * 0.05;
+                p.x += (handX - p.x) * 0.04;
+                p.y += (handY - p.y) * 0.04;
                 pos[i*3] = p.x; pos[i*3+1] = p.y; pos[i*3+2] = p.z;
             }
             particleSystem.geometry.attributes.position.needsUpdate = true;
             renderer.render(scene, camera);
         }
 
-        window.addEventListener('click', changeShape); // ক্লিক করলে নাম আসবে
         initThree();
     </script>
 </body>
